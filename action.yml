@@ -1,0 +1,112 @@
+name: "Build Alert — Telegram"
+description: "Send build, deploy, release, and CI status alerts to Telegram."
+author: "Sophat"
+branding:
+  icon: "send"
+  color: "blue"
+
+inputs:
+  telegram-bot-token:
+    description: "Telegram bot token from @BotFather"
+    required: true
+  telegram-chat-id:
+    description: "Target chat ID (user or group, e.g. -1001234567890)"
+    required: true
+  status:
+    description: "success | failure | cancelled | started"
+    required: true
+  stage:
+    description: "Build, Deploy, Release, Test, etc."
+    required: true
+  environment:
+    description: "production, staging, preview (optional)"
+    required: false
+    default: ""
+  extra:
+    description: "Extra HTML line appended to the message (optional). Use %0A for newlines."
+    required: false
+    default: ""
+  disable-notification:
+    description: "If 'true', send a silent Telegram message"
+    required: false
+    default: "false"
+
+outputs:
+  message-id:
+    description: "The Telegram message_id of the sent alert"
+    value: ${{ steps.send.outputs.message-id }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: send
+      shell: bash
+      env:
+        BOT_TOKEN: ${{ inputs.telegram-bot-token }}
+        CHAT_ID: ${{ inputs.telegram-chat-id }}
+        STATUS: ${{ inputs.status }}
+        STAGE: ${{ inputs.stage }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        EXTRA: ${{ inputs.extra }}
+        SILENT: ${{ inputs.disable-notification }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        ACTOR: ${{ github.actor }}
+        SHA: ${{ github.sha }}
+        RUN_ID: ${{ github.run_id }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        EVENT: ${{ github.event_name }}
+      run: |
+        set -euo pipefail
+
+        # Belt-and-suspenders: register credentials as masked so they can never
+        # appear in this job's logs, even if a downstream step echoes them.
+        echo "::add-mask::${BOT_TOKEN}"
+        echo "::add-mask::${CHAT_ID}"
+
+        case "$STATUS" in
+          success)   ICON="✅"; TITLE="Succeeded" ;;
+          failure)   ICON="❌"; TITLE="Failed" ;;
+          cancelled) ICON="⚪"; TITLE="Cancelled" ;;
+          started)   ICON="🚀"; TITLE="Started" ;;
+          *)         ICON="ℹ️"; TITLE="$STATUS" ;;
+        esac
+
+        SHORT_SHA="${SHA:0:7}"
+        ENV_LINE=""
+        if [ -n "$ENVIRONMENT" ]; then
+          ENV_LINE="<b>Env:</b> <code>${ENVIRONMENT}</code>%0A"
+        fi
+        EXTRA_LINE=""
+        if [ -n "$EXTRA" ]; then
+          EXTRA_LINE="%0A${EXTRA}"
+        fi
+
+        TEXT="${ICON} <b>${STAGE} ${TITLE}</b>%0A"
+        TEXT="${TEXT}<b>Repo:</b> <code>${REPO}</code>%0A"
+        TEXT="${TEXT}<b>Branch:</b> <code>${BRANCH}</code>%0A"
+        TEXT="${TEXT}${ENV_LINE}"
+        TEXT="${TEXT}<b>Actor:</b> ${ACTOR}%0A"
+        TEXT="${TEXT}<b>Event:</b> ${EVENT}%0A"
+        TEXT="${TEXT}<b>Commit:</b> <a href=\"${COMMIT_URL}\">${SHORT_SHA}</a>%0A"
+        TEXT="${TEXT}<b>Run:</b> <a href=\"${RUN_URL}\">#${RUN_ID}</a>"
+        TEXT="${TEXT}${EXTRA_LINE}"
+
+        RESP=$(curl -sS -X POST \
+          "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+          -d "chat_id=${CHAT_ID}" \
+          -d "parse_mode=HTML" \
+          -d "disable_web_page_preview=true" \
+          -d "disable_notification=${SILENT}" \
+          --data-urlencode "text=${TEXT}")
+
+        echo "$RESP"
+
+        if ! echo "$RESP" | grep -q '"ok":true'; then
+          echo "::error::Telegram API returned an error"
+          exit 1
+        fi
+
+        MSG_ID=$(echo "$RESP" | sed -n 's/.*"message_id":\([0-9]*\).*/\1/p' | head -n1)
+        echo "message-id=${MSG_ID}" >> "$GITHUB_OUTPUT"

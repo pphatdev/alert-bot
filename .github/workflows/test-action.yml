@@ -1,0 +1,27 @@
+name: Self-test (action.yml)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "action.yml"
+      - ".github/workflows/test-action.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Send test alert
+        uses: ./
+        with:
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: success
+          stage: Self-test
+          environment: ci
+          extra: "<b>Note:</b> action.yml smoke test"
