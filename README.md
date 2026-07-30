@@ -13,7 +13,7 @@ Ships with ready-to-use CI/CD workflows for **Cloudflare Workers** as examples.
     status: success            # success | failure | cancelled | started
     stage:  Deploy             # any label — Build, Deploy, Release, Migration, ...
     environment: production    # optional
-    extra: "<b>URL:</b> https://example.workers.dev"   # optional HTML, %0A for newlines
+    extra: "<b>URL:</b> https://example.workers.dev"   # optional HTML, \n for newlines
 ```
 
 Inside this repo, workflows reference it with `uses: ./` (local path). External repos use `uses: sophat/build-alert@v1` once you tag a release.
@@ -27,7 +27,7 @@ Inside this repo, workflows reference it with `uses: ./` (local path). External 
 | `status` | ✅ | `success` \| `failure` \| `cancelled` \| `started` |
 | `stage` | ✅ | Free-form label — `Build`, `Deploy`, `Release`, `Migration`, ... |
 | `environment` | ❌ | `production`, `staging`, `preview`, ... |
-| `extra` | ❌ | Extra HTML line(s) appended. Use `%0A` for newlines. |
+| `extra` | ❌ | Extra HTML line(s) appended. Use `\n` for newlines. |
 | `disable-notification` | ❌ | `true` for silent messages |
 
 ## Outputs

@@ -23,7 +23,7 @@ inputs:
     required: false
     default: ""
   extra:
-    description: "Extra HTML line appended to the message (optional). Use %0A for newlines."
+    description: "Extra HTML line appended to the message (optional). Use \\n for newlines."
     required: false
     default: ""
   disable-notification:
@@ -74,22 +74,26 @@ runs:
         esac
 
         SHORT_SHA="${SHA:0:7}"
+        NL=$'\n'
+
         ENV_LINE=""
         if [ -n "$ENVIRONMENT" ]; then
-          ENV_LINE="<b>Env:</b> <code>${ENVIRONMENT}</code>%0A"
+          ENV_LINE="<b>Env:</b> <code>${ENVIRONMENT}</code>${NL}"
         fi
         EXTRA_LINE=""
         if [ -n "$EXTRA" ]; then
-          EXTRA_LINE="%0A${EXTRA}"
+          # Interpret literal \n sequences in the user-supplied extra as real newlines.
+          EXTRA_EXPANDED=$(printf '%b' "$EXTRA")
+          EXTRA_LINE="${NL}${EXTRA_EXPANDED}"
         fi
 
-        TEXT="${ICON} <b>${STAGE} ${TITLE}</b>%0A"
-        TEXT="${TEXT}<b>Repo:</b> <code>${REPO}</code>%0A"
-        TEXT="${TEXT}<b>Branch:</b> <code>${BRANCH}</code>%0A"
+        TEXT="${ICON} <b>${STAGE} ${TITLE}</b>${NL}"
+        TEXT="${TEXT}<b>Repo:</b> <code>${REPO}</code>${NL}"
+        TEXT="${TEXT}<b>Branch:</b> <code>${BRANCH}</code>${NL}"
         TEXT="${TEXT}${ENV_LINE}"
-        TEXT="${TEXT}<b>Actor:</b> ${ACTOR}%0A"
-        TEXT="${TEXT}<b>Event:</b> ${EVENT}%0A"
-        TEXT="${TEXT}<b>Commit:</b> <a href=\"${COMMIT_URL}\">${SHORT_SHA}</a>%0A"
+        TEXT="${TEXT}<b>Actor:</b> ${ACTOR}${NL}"
+        TEXT="${TEXT}<b>Event:</b> ${EVENT}${NL}"
+        TEXT="${TEXT}<b>Commit:</b> <a href=\"${COMMIT_URL}\">${SHORT_SHA}</a>${NL}"
         TEXT="${TEXT}<b>Run:</b> <a href=\"${RUN_URL}\">#${RUN_ID}</a>"
         TEXT="${TEXT}${EXTRA_LINE}"
 

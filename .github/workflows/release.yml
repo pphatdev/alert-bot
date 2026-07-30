@@ -20,4 +20,4 @@ jobs:
           telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           status: success
           stage: Release
-          extra: "<b>Tag:</b> <code>${{ github.event.release.tag_name }}</code>%0A<b>Name:</b> ${{ github.event.release.name }}%0A<b>URL:</b> ${{ github.event.release.html_url }}"
+          extra: "<b>Tag:</b> <code>${{ github.event.release.tag_name }}</code>\n<b>Name:</b> ${{ github.event.release.name }}\n<b>URL:</b> ${{ github.event.release.html_url }}"
