@@ -1,5 +1,5 @@
 name: "Telegram Bot Alert Action"
-description: "Send build, deploy, release, and CI status alerts to Telegram."
+description: "Send build, deploy, release, and CI status alerts to Telegram, with a PR-comment fallback."
 author: "pphatdev"
 branding:
   icon: "send"
@@ -7,11 +7,13 @@ branding:
 
 inputs:
   telegram-bot-token:
-    description: "Telegram bot token from @BotFather"
-    required: true
+    description: "Telegram bot token from @BotFather. If empty, Telegram send is skipped and the alert falls back to a PR comment when the event is a pull_request."
+    required: false
+    default: ""
   telegram-chat-id:
-    description: "Target chat ID (user or group, e.g. -1001234567890)"
-    required: true
+    description: "Target chat ID (user or group, e.g. -1001234567890). If empty, Telegram send is skipped and the alert falls back to a PR comment when the event is a pull_request."
+    required: false
+    default: ""
   status:
     description: "success | failure | cancelled | started"
     required: true
@@ -30,11 +32,24 @@ inputs:
     description: "If 'true', send a silent Telegram message"
     required: false
     default: "false"
+  github-token:
+    description: "Token used to post the PR-comment fallback when Telegram credentials are absent. Caller workflow must grant pull-requests: write."
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   message-id:
-    description: "The Telegram message_id of the sent alert"
+    description: "The Telegram message_id of the sent alert (empty when Telegram was skipped)"
     value: ${{ steps.send.outputs.message-id }}
+  comment-id:
+    description: "The GitHub PR comment id when the fallback comment was posted (empty otherwise)"
+    value: ${{ steps.send.outputs.comment-id }}
+  channel:
+    description: "Which channel received the alert: 'telegram', 'pr-comment', or 'none'"
+    value: ${{ steps.send.outputs.channel }}
+  message:
+    description: "The rendered alert message (HTML when delivered to Telegram, Markdown when delivered to a PR comment)"
+    value: ${{ steps.send.outputs.message }}
 
 runs:
   using: "composite"
@@ -49,6 +64,7 @@ runs:
         ENVIRONMENT: ${{ inputs.environment }}
         EXTRA: ${{ inputs.extra }}
         SILENT: ${{ inputs.disable-notification }}
+        GH_TOKEN: ${{ inputs.github-token }}
         REPO: ${{ github.repository }}
         BRANCH: ${{ github.ref_name }}
         ACTOR: ${{ github.actor }}
@@ -58,6 +74,8 @@ runs:
         COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
         ACTOR_URL: ${{ github.server_url }}/${{ github.actor }}
         EVENT: ${{ github.event_name }}
+        EVENT_PATH: ${{ github.event_path }}
+        API_URL: ${{ github.api_url }}
       run: |
         set -euo pipefail
 
@@ -80,41 +98,131 @@ runs:
         ACTOR="${ACTOR:-pphatdev}"
         ACTOR_URL="${ACTOR_URL:-https://github.com/${ACTOR}}"
 
-        ENV_LINE=""
-        if [ -n "$ENVIRONMENT" ]; then
-          ENV_LINE="🌐 <b>Env:</b> <code>${ENVIRONMENT}</code>${NL}"
-        fi
-        EXTRA_LINE=""
+        EXTRA_EXPANDED=""
         if [ -n "$EXTRA" ]; then
           # Interpret literal \n sequences in the user-supplied extra as real newlines.
           EXTRA_EXPANDED=$(printf '%b' "$EXTRA")
-          EXTRA_LINE="${NL}${EXTRA_EXPANDED}"
         fi
 
-        TEXT="${ICON} <b>${STAGE} ${TITLE}</b>${TRAIL}${NL}${NL}"
-        TEXT="${TEXT}📦 <b>Repo:</b> <code>${REPO}</code>${NL}"
-        TEXT="${TEXT}🌿 <b>Branch:</b> <code>${BRANCH}</code>${NL}"
-        TEXT="${TEXT}${ENV_LINE}"
-        TEXT="${TEXT}👤 <b>Actor:</b> <a href=\"${ACTOR_URL}\">${ACTOR}</a>${NL}"
-        TEXT="${TEXT}⚡ <b>Event:</b> ${EVENT}${NL}"
-        TEXT="${TEXT}🔖 <b>Commit:</b> <a href=\"${COMMIT_URL}\">${SHORT_SHA}</a>${NL}"
-        TEXT="${TEXT}🏃 <b>Run:</b> <a href=\"${RUN_URL}\">#${RUN_ID}</a>"
-        TEXT="${TEXT}${EXTRA_LINE}"
+        # Multiline output helper (heredoc with a random delimiter).
+        write_output() {
+          local key="$1" value="$2" delim
+          delim="EOF_$(uuidgen 2>/dev/null || echo "${RANDOM}${RANDOM}${RANDOM}")"
+          {
+            printf '%s<<%s\n' "$key" "$delim"
+            printf '%s\n' "$value"
+            printf '%s\n' "$delim"
+          } >> "$GITHUB_OUTPUT"
+        }
 
-        RESP=$(curl -sS -X POST \
-          "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-          -d "chat_id=${CHAT_ID}" \
-          -d "parse_mode=HTML" \
-          -d "disable_web_page_preview=true" \
-          -d "disable_notification=${SILENT}" \
-          --data-urlencode "text=${TEXT}")
+        # --- Route: Telegram when creds present, else PR-comment fallback. ---
+        if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+          ENV_LINE=""
+          if [ -n "$ENVIRONMENT" ]; then
+            ENV_LINE="🌐 <b>Env:</b> <code>${ENVIRONMENT}</code>${NL}"
+          fi
+          EXTRA_LINE=""
+          if [ -n "$EXTRA_EXPANDED" ]; then
+            EXTRA_LINE="${NL}${EXTRA_EXPANDED}"
+          fi
 
-        echo "$RESP"
+          TEXT="${ICON} <b>${STAGE} ${TITLE}</b>${TRAIL}${NL}${NL}"
+          TEXT="${TEXT}📦 <b>Repo:</b> <code>${REPO}</code>${NL}"
+          TEXT="${TEXT}🌿 <b>Branch:</b> <code>${BRANCH}</code>${NL}"
+          TEXT="${TEXT}${ENV_LINE}"
+          TEXT="${TEXT}👤 <b>Actor:</b> <a href=\"${ACTOR_URL}\">${ACTOR}</a>${NL}"
+          TEXT="${TEXT}⚡ <b>Event:</b> ${EVENT}${NL}"
+          TEXT="${TEXT}🔖 <b>Commit:</b> <a href=\"${COMMIT_URL}\">${SHORT_SHA}</a>${NL}"
+          TEXT="${TEXT}🏃 <b>Run:</b> <a href=\"${RUN_URL}\">#${RUN_ID}</a>"
+          TEXT="${TEXT}${EXTRA_LINE}"
 
-        if ! echo "$RESP" | grep -q '"ok":true'; then
-          echo "::error::Telegram API returned an error"
+          RESP=$(curl -sS -X POST \
+            "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${CHAT_ID}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true" \
+            -d "disable_notification=${SILENT}" \
+            --data-urlencode "text=${TEXT}")
+
+          echo "$RESP"
+
+          if ! echo "$RESP" | grep -q '"ok":true'; then
+            echo "::error::Telegram API returned an error"
+            exit 1
+          fi
+
+          MSG_ID=$(echo "$RESP" | sed -n 's/.*"message_id":\([0-9]*\).*/\1/p' | head -n1)
+          echo "message-id=${MSG_ID}" >> "$GITHUB_OUTPUT"
+          echo "channel=telegram" >> "$GITHUB_OUTPUT"
+          write_output "message" "$TEXT"
+          exit 0
+        fi
+
+        echo "::notice::Telegram credentials not provided — skipping Telegram send."
+
+        # Convert HTML-formatted extra to Markdown so the fallback comment renders cleanly.
+        EXTRA_MD=""
+        if [ -n "$EXTRA_EXPANDED" ]; then
+          EXTRA_MD=$(printf '%s' "$EXTRA_EXPANDED" \
+            | sed -e 's|<b>|**|g' -e 's|</b>|**|g' \
+                  -e 's|<i>|_|g'  -e 's|</i>|_|g' \
+                  -e 's|<code>|`|g' -e 's|</code>|`|g')
+        fi
+
+        ENV_LINE_MD=""
+        if [ -n "$ENVIRONMENT" ]; then
+          ENV_LINE_MD="- 🌐 **Env:** \`${ENVIRONMENT}\`${NL}"
+        fi
+        EXTRA_LINE_MD=""
+        if [ -n "$EXTRA_MD" ]; then
+          EXTRA_LINE_MD="${NL}${EXTRA_MD}"
+        fi
+
+        TEXT_MD="### ${ICON} ${STAGE} ${TITLE}${TRAIL}${NL}${NL}"
+        TEXT_MD="${TEXT_MD}- 📦 **Repo:** \`${REPO}\`${NL}"
+        TEXT_MD="${TEXT_MD}- 🌿 **Branch:** \`${BRANCH}\`${NL}"
+        TEXT_MD="${TEXT_MD}${ENV_LINE_MD}"
+        TEXT_MD="${TEXT_MD}- 👤 **Actor:** [${ACTOR}](${ACTOR_URL})${NL}"
+        TEXT_MD="${TEXT_MD}- ⚡ **Event:** ${EVENT}${NL}"
+        TEXT_MD="${TEXT_MD}- 🔖 **Commit:** [\`${SHORT_SHA}\`](${COMMIT_URL})${NL}"
+        TEXT_MD="${TEXT_MD}- 🏃 **Run:** [#${RUN_ID}](${RUN_URL})"
+        TEXT_MD="${TEXT_MD}${EXTRA_LINE_MD}"
+
+        write_output "message" "$TEXT_MD"
+
+        if [ "$EVENT" != "pull_request" ] && [ "$EVENT" != "pull_request_target" ]; then
+          echo "::warning::Event is '${EVENT}' — no PR to comment on. Alert body available on the 'message' output."
+          echo "channel=none" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        if [ -z "$GH_TOKEN" ]; then
+          echo "::error::github-token is empty; cannot post PR-comment fallback."
           exit 1
         fi
 
-        MSG_ID=$(echo "$RESP" | sed -n 's/.*"message_id":\([0-9]*\).*/\1/p' | head -n1)
-        echo "message-id=${MSG_ID}" >> "$GITHUB_OUTPUT"
+        PR_NUMBER=$(jq -r '.pull_request.number // .number // empty' "$EVENT_PATH")
+        if [ -z "$PR_NUMBER" ]; then
+          echo "::error::Could not determine PR number from event payload."
+          exit 1
+        fi
+
+        BODY_JSON=$(jq -Rn --arg b "$TEXT_MD" '{body: $b}')
+
+        RESP=$(curl -sS -X POST \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "${API_URL}/repos/${REPO}/issues/${PR_NUMBER}/comments" \
+          --data-binary "$BODY_JSON")
+
+        echo "$RESP"
+
+        COMMENT_ID=$(printf '%s' "$RESP" | jq -r '.id // empty')
+        if [ -z "$COMMENT_ID" ]; then
+          echo "::error::Failed to post PR comment"
+          exit 1
+        fi
+
+        echo "comment-id=${COMMENT_ID}" >> "$GITHUB_OUTPUT"
+        echo "channel=pr-comment" >> "$GITHUB_OUTPUT"

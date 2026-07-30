@@ -18,23 +18,57 @@ Ships with ready-to-use CI/CD workflows for **Cloudflare Workers** as examples.
 
 Inside this repo, workflows reference it with `uses: ./` (local path). External repos use `uses: pphatdev/telegrambot-alert-action@v1` once you tag a release.
 
+### PR-comment fallback (no Telegram creds required)
+
+If you omit `telegram-bot-token` / `telegram-chat-id`, the action **skips the Telegram send** and, on `pull_request` / `pull_request_target` events, posts the same alert as a Markdown comment on the PR. On any other event it exits cleanly with the rendered body in the `message` output. This lets any repo consume the action globally without provisioning Telegram secrets first.
+
+```yaml
+name: PR checks
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: write   # required for the fallback comment
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npm test
+
+      - if: always()
+        uses: pphatdev/telegrambot-alert-action@v1
+        with:
+          # telegram-* intentionally omitted → fallback to PR comment
+          status: ${{ job.status }}
+          stage:  CI
+          extra:  "<b>Run:</b> ${{ github.run_id }}"
+```
+
+Provide the creds later (repo/organization secrets) and the same call automatically switches back to Telegram — no workflow change needed.
+
 ## Inputs
 
 | Input | Required | Description |
 |---|---|---|
-| `telegram-bot-token` | ✅ | Bot token from @BotFather |
-| `telegram-chat-id` | ✅ | Chat ID (user or group, e.g. `-1001234567890`) |
+| `telegram-bot-token` | ❌ | Bot token from @BotFather. Omit to skip Telegram and use the PR-comment fallback. |
+| `telegram-chat-id` | ❌ | Chat ID (user or group, e.g. `-1001234567890`). Omit to skip Telegram and use the PR-comment fallback. |
 | `status` | ✅ | `success` \| `failure` \| `cancelled` \| `started` |
 | `stage` | ✅ | Free-form label — `Build`, `Deploy`, `Release`, `Migration`, ... |
 | `environment` | ❌ | `production`, `staging`, `preview`, ... |
 | `extra` | ❌ | Extra HTML line(s) appended. Use `\n` for newlines. |
 | `disable-notification` | ❌ | `true` for silent messages |
+| `github-token` | ❌ | Token used to post the PR-comment fallback. Defaults to `${{ github.token }}`; caller workflow must grant `pull-requests: write`. |
 
 ## Outputs
 
 | Output | Description |
 |---|---|
-| `message-id` | Telegram `message_id` of the sent alert |
+| `message-id` | Telegram `message_id` of the sent alert (empty when Telegram was skipped) |
+| `comment-id` | GitHub PR comment id when the fallback comment was posted (empty otherwise) |
+| `channel`    | Which channel received the alert: `telegram`, `pr-comment`, or `none` |
+| `message`    | The rendered alert body (HTML for Telegram, Markdown for PR comments) |
 
 ## Sample message
 
@@ -58,7 +92,7 @@ URL: https://my-worker.workers.dev
 | `.github/workflows/ci.yml` | push / PR on `main`, `develop` | Build success or failure |
 | `.github/workflows/deploy.yml` | push to `main`, manual dispatch | Deploy started, success (with URL), or failure |
 | `.github/workflows/release.yml` | GitHub release published | Release announcement with tag + URL |
-| `.github/workflows/test-action.yml` | manual / change to `action.yml` | Sends a smoke-test message |
+| `.github/workflows/test-action.yml` | manual / push / PR touching `action.yml` | `smoke` job sends a Telegram message; `pr-fallback` job runs on PRs without creds and asserts the PR-comment fallback path |
 
 ### Choosing runtime & version
 
