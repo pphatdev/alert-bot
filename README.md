@@ -20,7 +20,9 @@ Inside this repo, workflows reference it with `uses: ./` (local path). External 
 
 ### PR-comment fallback (no Telegram creds required)
 
-If you omit `telegram-bot-token` / `telegram-chat-id`, the action **skips the Telegram send** and, on `pull_request` / `pull_request_target` events, posts the same alert as a Markdown comment on the PR. On any other event it exits cleanly with the rendered body in the `message` output. This lets any repo consume the action globally without provisioning Telegram secrets first.
+If you omit `telegram-bot-token` / `telegram-chat-id`, the action **skips the Telegram send** and, on `pull_request` / `pull_request_target` events, posts the same alert as a Markdown comment on the PR. On any other event — or when the comment can't be posted (missing `pull-requests: write` permission, fork PR with a read-only token, 4xx from the API) — it emits a warning, sets `channel=none`, and **exits successfully** with the rendered body available on the `message` output. Downstream steps keep running; you never lose the job over a missing notify channel.
+
+> **Fork PRs.** `pull_request` triggers from forks get a read-only `GITHUB_TOKEN`, so the fallback comment will 403 and skip. Either gate the notify step (`if: github.event.pull_request.head.repo.fork == false`) or use `pull_request_target` (only if you've reviewed the security implications).
 
 ```yaml
 name: PR checks
