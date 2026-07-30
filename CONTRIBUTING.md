@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in build-alert. This is a small composite action — most contributions are welcome as PRs directly.
+Thanks for your interest in telegrambot-alert-action. This is a small composite action — most contributions are welcome as PRs directly.
 
 ## Before you start
 
@@ -33,8 +33,8 @@ Features that don't fit that shape are unlikely to land.
 ### Setup
 
 ```bash
-git clone https://github.com/pphatdev/tg-alert-bot.git
-cd tg-alert-bot
+git clone https://github.com/pphatdev/telegrambot-alert-action.git
+cd telegrambot-alert-action
 git checkout -b your-branch
 ```
 

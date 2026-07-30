@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest major-version tag receives security fixes. Consumers should pin to a rolling major tag (`uses: pphatdev/build-alert@v1`) to receive them automatically.
+Only the latest major-version tag receives security fixes. Consumers should pin to a rolling major tag (`uses: pphatdev/telegrambot-alert-action@v1`) to receive them automatically.
 
 | Version | Supported |
 |---|---|
@@ -15,8 +15,8 @@ Only the latest major-version tag receives security fixes. Consumers should pin 
 
 Use one of the following private channels:
 
-1. **GitHub private vulnerability reporting** (preferred) — [open a private advisory](https://github.com/pphatdev/tg-alert-bot/security/advisories/new).
-2. **Email** — `turbotech.kh@gmail.com` with the subject line `build-alert security`.
+1. **GitHub private vulnerability reporting** (preferred) — [open a private advisory](https://github.com/pphatdev/telegrambot-alert-action/security/advisories/new).
+2. **Email** — `hi@pphat.me` with the subject line `telegrambot-alert-action security`.
 
 Include:
 

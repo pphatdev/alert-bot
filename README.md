@@ -1,4 +1,4 @@
-# build-alert
+# telegrambot-alert-action
 
 A **GitHub Action** that sends build, deploy, release, and CI status alerts to **Telegram**.
 Ships with ready-to-use CI/CD workflows for **Cloudflare Workers** as examples.
@@ -6,7 +6,7 @@ Ships with ready-to-use CI/CD workflows for **Cloudflare Workers** as examples.
 ## Use it in your workflow
 
 ```yaml
-- uses: sophat/build-alert@v1
+- uses: pphatdev/telegrambot-alert-action@v1
   with:
     telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     telegram-chat-id:   ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -16,7 +16,7 @@ Ships with ready-to-use CI/CD workflows for **Cloudflare Workers** as examples.
     extra: "<b>URL:</b> https://example.workers.dev"   # optional HTML, \n for newlines
 ```
 
-Inside this repo, workflows reference it with `uses: ./` (local path). External repos use `uses: sophat/build-alert@v1` once you tag a release.
+Inside this repo, workflows reference it with `uses: ./` (local path). External repos use `uses: pphatdev/telegrambot-alert-action@v1` once you tag a release.
 
 ## Inputs
 
@@ -41,10 +41,10 @@ Inside this repo, workflows reference it with `uses: ./` (local path). External 
 ```
 ✅ Deploy Succeeded 🎉
 
-📦 Repo: sophat/my-worker
+📦 Repo: pphatdev/my-worker
 🌿 Branch: main
 🌐 Env: production
-👤 Actor: turbotech
+👤 Actor: pphatdev
 ⚡ Event: push
 🔖 Commit: 3f2a1b0
 🏃 Run: #12345
@@ -98,12 +98,12 @@ Create the CF token at `dash.cloudflare.com → My Profile → API Tokens → Cr
 ### 3. Publish this action (so other repos can consume it)
 
 ```bash
-git init && git add . && git commit -m "chore: initial build-alert action"
+git init && git add . && git commit -m "chore: initial telegrambot-alert-action"
 git tag v1
 git push origin main --tags
 ```
 
-Then in any other repo: `uses: <your-gh-org>/build-alert@v1`.
+Then in any other repo: `uses: pphatdev/telegrambot-alert-action@v1`.
 
 ## Advanced
 
