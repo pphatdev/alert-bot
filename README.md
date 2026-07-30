@@ -6,7 +6,7 @@ Ships with ready-to-use CI/CD workflows for **Cloudflare Workers** as examples.
 ## Use it in your workflow
 
 ```yaml
-- uses: pphatdev/telegrambot-alert-action@v1
+- uses: pphatdev/telegrambot-alert-action@v1.1
   with:
     telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
     telegram-chat-id:   ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -16,7 +16,7 @@ Ships with ready-to-use CI/CD workflows for **Cloudflare Workers** as examples.
     extra: "<b>URL:</b> https://example.workers.dev"   # optional HTML, \n for newlines
 ```
 
-Inside this repo, workflows reference it with `uses: ./` (local path). External repos use `uses: pphatdev/telegrambot-alert-action@v1` once you tag a release.
+Inside this repo, workflows reference it with `uses: ./` (local path). External repos use `uses: pphatdev/telegrambot-alert-action@v1.1` once you tag a release.
 
 ### PR-comment fallback (no Telegram creds required)
 
@@ -40,7 +40,7 @@ jobs:
       - run: npm ci && npm test
 
       - if: always()
-        uses: pphatdev/telegrambot-alert-action@v1
+        uses: pphatdev/telegrambot-alert-action@v1.1
         with:
           # telegram-* intentionally omitted → fallback to PR comment
           status: ${{ job.status }}
@@ -49,6 +49,24 @@ jobs:
 ```
 
 Provide the creds later (repo/organization secrets) and the same call automatically switches back to Telegram — no workflow change needed.
+
+### Reading the outputs
+
+Give the notify step an `id` and downstream steps can branch on which channel was used or reuse the rendered message:
+
+```yaml
+      - id: notify
+        if: always()
+        uses: pphatdev/telegrambot-alert-action@v1.1
+        with:
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          status: ${{ job.status }}
+          stage:  Deploy
+
+      - if: steps.notify.outputs.channel == 'none'
+        run: echo "Alert not delivered; body was:" && echo "${{ steps.notify.outputs.message }}"
+```
 
 ## Inputs
 
@@ -135,11 +153,13 @@ Create the CF token at `dash.cloudflare.com → My Profile → API Tokens → Cr
 
 ```bash
 git init && git add . && git commit -m "chore: initial telegrambot-alert-action"
-git tag v1
-git push origin main --tags
+git tag v1.1.0
+git tag -f v1.1        # rolling minor tag
+git tag -f v1          # rolling major tag
+git push origin main --tags --force
 ```
 
-Then in any other repo: `uses: pphatdev/telegrambot-alert-action@v1`.
+Then in any other repo: `uses: pphatdev/telegrambot-alert-action@v1.1`.
 
 ## Advanced
 
@@ -153,7 +173,7 @@ Then in any other repo: `uses: pphatdev/telegrambot-alert-action@v1`.
 
 - **Secret masking.** The action re-registers `telegram-bot-token` and `telegram-chat-id` with `::add-mask::` at the start of its script so they are redacted from logs even across the composite-action boundary.
 - **Injection-safe interpolation.** All caller-supplied and `github.*` context values (commit messages, branch names, etc.) flow through `env:` and are only concatenated inside double-quoted bash strings — never spliced into a `run:` script via `${{ ... }}`. A commit message like `$(rm -rf /)` becomes a literal string sent to Telegram, not executed.
-- **No secrets on forked PRs.** `ci.yml` uses `pull_request` (not `pull_request_target`), so fork PRs get an empty secret and the notify step will fail loudly rather than leak.
+- **No secrets on forked PRs.** `ci.yml` uses `pull_request` (not `pull_request_target`), so fork PRs get empty secrets. The notify step routes to the PR-comment fallback, which soft-skips with a `::warning::` (fork PRs also can't post comments with the read-only token) — the job stays green and no secret material can leak.
 - **Least-privilege token.** Every workflow declares `permissions: contents: read`. The Cloudflare deploy uses the CF API token, not `GITHUB_TOKEN`.
 - **SHA-pinned actions.** Third-party actions are pinned to commit SHAs with the version in a trailing comment. Dependabot (`.github/dependabot.yml`) opens weekly PRs to update them.
 

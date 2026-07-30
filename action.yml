@@ -145,9 +145,10 @@ runs:
             -d "disable_notification=${SILENT}" \
             --data-urlencode "text=${TEXT}")
 
-          echo "$RESP"
-
           if ! echo "$RESP" | grep -q '"ok":true'; then
+            # Only surface the response body on failure so successful sends
+            # don't leak chat metadata into the job log.
+            echo "$RESP"
             echo "::error::Telegram API returned an error"
             exit 1
           fi
@@ -223,10 +224,12 @@ runs:
           --data-binary "$BODY_JSON")
 
         RESP=$(cat /tmp/tg-alert-resp.json)
-        echo "$RESP"
 
         COMMENT_ID=$(printf '%s' "$RESP" | jq -r '.id // empty')
         if [ -z "$COMMENT_ID" ]; then
+          # Only surface the response body on failure to keep successful
+          # runs quiet in the job log.
+          echo "$RESP"
           case "$HTTP_CODE" in
             403)
               skip_fallback "GitHub returned 403 posting the PR comment. The caller workflow likely needs 'permissions: pull-requests: write', or this PR is from a fork (fork PRs on pull_request events get a read-only token — switch the caller to pull_request_target with care, or gate the notify step). Alert body available on the 'message' output." ;;

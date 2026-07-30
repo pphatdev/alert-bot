@@ -9,6 +9,27 @@ Consumers should pin to a rolling major tag (`uses: pphatdev/telegrambot-alert-a
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-07-30
+
+### Added
+
+- Optional GitHub PR-comment fallback: when `telegram-bot-token` or `telegram-chat-id` is empty and the triggering event is a `pull_request` / `pull_request_target`, the rendered alert is posted as a PR comment instead of failing.
+- `github-token` input (defaults to `${{ github.token }}`) used to post the fallback comment; caller workflow must grant `pull-requests: write`.
+- New outputs: `comment-id` (populated when the fallback comment is posted), `channel` (`telegram` | `pr-comment` | `none`), and `message` (the rendered alert body — HTML when sent to Telegram, Markdown when posted as a PR comment).
+- `PRIVACY.md` documenting what data the action reads, sends, and logs.
+- Project governance docs: `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`.
+- `test-action.yml` smoke workflow that exercises `action.yml` end-to-end.
+
+### Changed
+
+- Renamed the project to **telegrambot-alert-action**; updated contact info and all doc references.
+- Fork PRs and other cases where the fallback cannot post (missing token, non-PR event, HTTP 403/404) now emit a `::warning::` and set `channel=none` instead of failing the job. The rendered alert is still exposed on the `message` output so the caller can route it elsewhere.
+- `::add-mask::` calls are now guarded so empty `telegram-bot-token` / `telegram-chat-id` no longer emit "add-mask with empty value" warnings.
+
+### Security
+
+- Successful Telegram and GitHub API responses are no longer echoed to the job log; the raw JSON is only printed when the request fails. Prevents accidental exposure of `chat.id`, `message_id`, `sender_tag`, and comment metadata on the happy path.
+
 ## [0.1.0] — 2026-07-30
 
 ### Added
@@ -37,5 +58,6 @@ Consumers should pin to a rolling major tag (`uses: pphatdev/telegrambot-alert-a
 - Newline handling in the message body — real newlines are now used instead of literal `%0A`, which `curl --data-urlencode` was double-encoding as `%250A` so Telegram rendered them as text. The `extra` input accepts `\n` for line breaks.
 - Node setup no longer fails when the consuming repo has no lockfile — `cache: npm` is only enabled when a lockfile is present, and install steps skip cleanly when no `package.json` / `deno.json` exists.
 
-[Unreleased]: https://github.com/pphatdev/telegrambot-alert-action/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/pphatdev/telegrambot-alert-action/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/pphatdev/telegrambot-alert-action/compare/v0.1.0...v1.1.0
 [0.1.0]: https://github.com/pphatdev/telegrambot-alert-action/releases/tag/v0.1.0
