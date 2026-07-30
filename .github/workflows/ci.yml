@@ -6,6 +6,17 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
+    inputs:
+      runtime:
+        description: "Runtime"
+        required: true
+        default: "node"
+        type: choice
+        options: [node, bun, deno]
+      runtime-version:
+        description: "Runtime version (e.g. 20 / 22 for node, 1.1.30 for bun, 2.1.4 for deno)"
+        required: false
+        default: "20"
 
 permissions:
   contents: read
@@ -14,31 +25,99 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  RUNTIME: ${{ inputs.runtime || 'node' }}
+  RUNTIME_VERSION: ${{ inputs.runtime-version || '20' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Setup Node.js
+        if: env.RUNTIME == 'node'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: ${{ env.RUNTIME_VERSION }}
+          cache: ${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock') != '' && 'npm' || '' }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Setup Bun
+        if: env.RUNTIME == 'bun'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.RUNTIME_VERSION }}
 
-      - name: Type check
-        run: npm run typecheck --if-present
+      - name: Setup Deno
+        if: env.RUNTIME == 'deno'
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: ${{ env.RUNTIME_VERSION }}
 
-      - name: Lint
-        run: npm run lint --if-present
+      - name: Install, check, test, build
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Test
-        run: npm test --if-present
+          run_if() {
+            local script="$1"
+            case "$RUNTIME" in
+              node)
+                npm run "$script" --if-present
+                ;;
+              bun)
+                if [ -f package.json ] && jq -e --arg s "$script" '.scripts[$s] // empty' package.json > /dev/null 2>&1; then
+                  bun run "$script"
+                else
+                  echo "skip: no '$script' script"
+                fi
+                ;;
+              deno)
+                if [ -f deno.json ] && jq -e --arg s "$script" '.tasks[$s] // empty' deno.json > /dev/null 2>&1; then
+                  deno task "$script"
+                else
+                  echo "skip: no '$script' task"
+                fi
+                ;;
+            esac
+          }
 
-      - name: Build
-        run: npm run build --if-present
+          case "$RUNTIME" in
+            node)
+              if [ -f package.json ]; then
+                if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+                  npm ci
+                else
+                  npm install
+                fi
+              else
+                echo "skip: no package.json — nothing to build"; exit 0
+              fi
+              ;;
+            bun)
+              if [ -f package.json ]; then
+                if [ -f bun.lockb ] || [ -f bun.lock ]; then
+                  bun install --frozen-lockfile
+                else
+                  bun install
+                fi
+              else
+                echo "skip: no package.json — nothing to build"; exit 0
+              fi
+              ;;
+            deno)
+              if [ -f deno.json ] || [ -f deno.jsonc ]; then
+                deno install
+              else
+                echo "skip: no deno.json — nothing to build"; exit 0
+              fi
+              ;;
+          esac
+
+          run_if typecheck
+          run_if lint
+          run_if test
+          run_if build
 
       - name: Notify Telegram — success
         if: success()
@@ -48,7 +127,7 @@ jobs:
           telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           status: success
           stage: Build
-          extra: "<b>Message:</b> ${{ github.event.head_commit.message }}"
+          extra: "<b>Runtime:</b> ${{ env.RUNTIME }} ${{ env.RUNTIME_VERSION }}\n<b>Message:</b> ${{ github.event.head_commit.message }}"
 
       - name: Notify Telegram — failure
         if: failure()
@@ -58,4 +137,4 @@ jobs:
           telegram-chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           status: failure
           stage: Build
-          extra: "<b>Message:</b> ${{ github.event.head_commit.message }}"
+          extra: "<b>Runtime:</b> ${{ env.RUNTIME }} ${{ env.RUNTIME_VERSION }}\n<b>Message:</b> ${{ github.event.head_commit.message }}"

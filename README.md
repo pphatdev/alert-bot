@@ -60,6 +60,18 @@ URL: https://my-worker.workers.dev
 | `.github/workflows/release.yml` | GitHub release published | Release announcement with tag + URL |
 | `.github/workflows/test-action.yml` | manual / change to `action.yml` | Sends a smoke-test message |
 
+### Choosing runtime & version
+
+`ci.yml` and `deploy.yml` accept a `runtime` (`node` \| `bun` \| `deno`) and a `runtime-version` when dispatched manually (`Actions → Run workflow`). Push/PR runs use the defaults (`node` 20).
+
+| Runtime | Install | Scripts source |
+|---|---|---|
+| node | `npm ci` | `package.json` → `scripts` (uses `--if-present`) |
+| bun | `bun install --frozen-lockfile` | `package.json` → `scripts` (skipped if missing) |
+| deno | `deno install` | `deno.json` → `tasks` (skipped if missing) |
+
+The workflows call `typecheck`, `lint`, `test`, and `build` in that order — define whichever your project has. The deploy workflow only runs `build`.
+
 ## Setup
 
 ### 1. Create a Telegram bot
