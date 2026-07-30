@@ -1,6 +1,6 @@
-name: "Build Alert — Telegram"
+name: "Telegram Bot Alert Action"
 description: "Send build, deploy, release, and CI status alerts to Telegram."
-author: "Sophat"
+author: "pphatdev"
 branding:
   icon: "send"
   color: "blue"

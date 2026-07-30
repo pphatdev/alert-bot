@@ -1,6 +1,6 @@
 # Privacy Notice
 
-This document explains what data the **build-alert** GitHub Action handles, where it goes, and what is retained. It applies to the composite action defined in `action.yml`, not to any consuming workflow's own logic.
+This document explains what data the **telegrambot-alert-action** GitHub Action handles, where it goes, and what is retained. It applies to the composite action defined in `action.yml`, not to any consuming workflow's own logic.
 
 ## TL;DR
 
@@ -62,4 +62,4 @@ Material changes will be recorded in `CHANGELOG.md` and, if impactful, called ou
 
 ## Contact
 
-Questions about data handling: `turbotech.kh@gmail.com`.
+Questions about data handling: `hi@pphat.me`.

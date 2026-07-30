@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Consumers should pin to a rolling major tag (`uses: <org>/build-alert@v1`) to automatically receive backwards-compatible fixes.
+Consumers should pin to a rolling major tag (`uses: pphatdev/telegrambot-alert-action@v1`) to automatically receive backwards-compatible fixes.
 
 ## [Unreleased]
 
@@ -37,5 +37,5 @@ Consumers should pin to a rolling major tag (`uses: <org>/build-alert@v1`) to au
 - Newline handling in the message body — real newlines are now used instead of literal `%0A`, which `curl --data-urlencode` was double-encoding as `%250A` so Telegram rendered them as text. The `extra` input accepts `\n` for line breaks.
 - Node setup no longer fails when the consuming repo has no lockfile — `cache: npm` is only enabled when a lockfile is present, and install steps skip cleanly when no `package.json` / `deno.json` exists.
 
-[Unreleased]: https://github.com/pphatdev/tg-alert-bot/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/pphatdev/tg-alert-bot/releases/tag/v0.1.0
+[Unreleased]: https://github.com/pphatdev/telegrambot-alert-action/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/pphatdev/telegrambot-alert-action/releases/tag/v0.1.0
