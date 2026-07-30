@@ -56,6 +56,7 @@ runs:
         RUN_ID: ${{ github.run_id }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        ACTOR_URL: ${{ github.server_url }}/${{ github.actor }}
         EVENT: ${{ github.event_name }}
       run: |
         set -euo pipefail
@@ -66,19 +67,22 @@ runs:
         echo "::add-mask::${CHAT_ID}"
 
         case "$STATUS" in
-          success)   ICON="✅"; TITLE="Succeeded" ;;
-          failure)   ICON="❌"; TITLE="Failed" ;;
-          cancelled) ICON="⚪"; TITLE="Cancelled" ;;
-          started)   ICON="🚀"; TITLE="Started" ;;
-          *)         ICON="ℹ️"; TITLE="$STATUS" ;;
+          success)   ICON="✅"; TITLE="Succeeded"; TRAIL=" 🎉" ;;
+          failure)   ICON="❌"; TITLE="Failed";    TRAIL=" 🛠️" ;;
+          cancelled) ICON="⚪"; TITLE="Cancelled"; TRAIL="" ;;
+          started)   ICON="🚀"; TITLE="Started";   TRAIL="" ;;
+          *)         ICON="ℹ️"; TITLE="$STATUS";   TRAIL="" ;;
         esac
 
         SHORT_SHA="${SHA:0:7}"
         NL=$'\n'
 
+        ACTOR="${ACTOR:-pphatdev}"
+        ACTOR_URL="${ACTOR_URL:-https://github.com/${ACTOR}}"
+
         ENV_LINE=""
         if [ -n "$ENVIRONMENT" ]; then
-          ENV_LINE="<b>Env:</b> <code>${ENVIRONMENT}</code>${NL}"
+          ENV_LINE="🌐 <b>Env:</b> <code>${ENVIRONMENT}</code>${NL}"
         fi
         EXTRA_LINE=""
         if [ -n "$EXTRA" ]; then
@@ -87,14 +91,14 @@ runs:
           EXTRA_LINE="${NL}${EXTRA_EXPANDED}"
         fi
 
-        TEXT="${ICON} <b>${STAGE} ${TITLE}</b>${NL}"
-        TEXT="${TEXT}<b>Repo:</b> <code>${REPO}</code>${NL}"
-        TEXT="${TEXT}<b>Branch:</b> <code>${BRANCH}</code>${NL}"
+        TEXT="${ICON} <b>${STAGE} ${TITLE}</b>${TRAIL}${NL}${NL}"
+        TEXT="${TEXT}📦 <b>Repo:</b> <code>${REPO}</code>${NL}"
+        TEXT="${TEXT}🌿 <b>Branch:</b> <code>${BRANCH}</code>${NL}"
         TEXT="${TEXT}${ENV_LINE}"
-        TEXT="${TEXT}<b>Actor:</b> ${ACTOR}${NL}"
-        TEXT="${TEXT}<b>Event:</b> ${EVENT}${NL}"
-        TEXT="${TEXT}<b>Commit:</b> <a href=\"${COMMIT_URL}\">${SHORT_SHA}</a>${NL}"
-        TEXT="${TEXT}<b>Run:</b> <a href=\"${RUN_URL}\">#${RUN_ID}</a>"
+        TEXT="${TEXT}👤 <b>Actor:</b> <a href=\"${ACTOR_URL}\">${ACTOR}</a>${NL}"
+        TEXT="${TEXT}⚡ <b>Event:</b> ${EVENT}${NL}"
+        TEXT="${TEXT}🔖 <b>Commit:</b> <a href=\"${COMMIT_URL}\">${SHORT_SHA}</a>${NL}"
+        TEXT="${TEXT}🏃 <b>Run:</b> <a href=\"${RUN_URL}\">#${RUN_ID}</a>"
         TEXT="${TEXT}${EXTRA_LINE}"
 
         RESP=$(curl -sS -X POST \

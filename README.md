@@ -39,14 +39,15 @@ Inside this repo, workflows reference it with `uses: ./` (local path). External 
 ## Sample message
 
 ```
-✅ Deploy Succeeded
-Repo: sophat/my-worker
-Branch: main
-Env: production
-Actor: turbotech
-Event: push
-Commit: 3f2a1b0
-Run: #12345
+✅ Deploy Succeeded 🎉
+
+📦 Repo: sophat/my-worker
+🌿 Branch: main
+🌐 Env: production
+👤 Actor: turbotech
+⚡ Event: push
+🔖 Commit: 3f2a1b0
+🏃 Run: #12345
 URL: https://my-worker.workers.dev
 ```
 
