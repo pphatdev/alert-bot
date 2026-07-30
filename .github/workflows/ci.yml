@@ -40,7 +40,7 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.RUNTIME_VERSION }}
-          cache: "npm"
+          cache: ${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock') != '' && 'npm' || '' }}
 
       - name: Setup Bun
         if: env.RUNTIME == 'bun'
@@ -83,9 +83,35 @@ jobs:
           }
 
           case "$RUNTIME" in
-            node) npm ci ;;
-            bun)  bun install --frozen-lockfile ;;
-            deno) deno install ;;
+            node)
+              if [ -f package.json ]; then
+                if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+                  npm ci
+                else
+                  npm install
+                fi
+              else
+                echo "skip: no package.json — nothing to build"; exit 0
+              fi
+              ;;
+            bun)
+              if [ -f package.json ]; then
+                if [ -f bun.lockb ] || [ -f bun.lock ]; then
+                  bun install --frozen-lockfile
+                else
+                  bun install
+                fi
+              else
+                echo "skip: no package.json — nothing to build"; exit 0
+              fi
+              ;;
+            deno)
+              if [ -f deno.json ] || [ -f deno.jsonc ]; then
+                deno install
+              else
+                echo "skip: no deno.json — nothing to build"; exit 0
+              fi
+              ;;
           esac
 
           run_if typecheck
