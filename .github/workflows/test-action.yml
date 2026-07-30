@@ -6,12 +6,18 @@ on:
     paths:
       - "action.yml"
       - ".github/workflows/test-action.yml"
+  pull_request:
+    paths:
+      - "action.yml"
+      - ".github/workflows/test-action.yml"
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   smoke:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: development
     steps:
@@ -26,3 +32,41 @@ jobs:
           stage: Self-test
           environment: development
           extra: "<b>Note:</b> action.yml smoke test"
+
+  pr-fallback:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: alert
+        name: Run action without Telegram creds
+        uses: ./
+        with:
+          status: success
+          stage: PR-fallback self-test
+          environment: development
+          extra: "<b>Note:</b> testing PR-comment fallback (Telegram creds intentionally omitted)"
+
+      - name: Assert fallback channel was used
+        shell: bash
+        env:
+          CHANNEL: ${{ steps.alert.outputs.channel }}
+          COMMENT_ID: ${{ steps.alert.outputs.comment-id }}
+          MESSAGE_ID: ${{ steps.alert.outputs.message-id }}
+        run: |
+          echo "channel=${CHANNEL}"
+          echo "comment-id=${COMMENT_ID}"
+          echo "message-id=${MESSAGE_ID}"
+          if [ "$CHANNEL" != "pr-comment" ]; then
+            echo "::error::Expected channel=pr-comment, got '${CHANNEL}'"
+            exit 1
+          fi
+          if [ -z "$COMMENT_ID" ]; then
+            echo "::error::comment-id output was empty"
+            exit 1
+          fi
+          if [ -n "$MESSAGE_ID" ]; then
+            echo "::error::message-id should be empty when Telegram is skipped, got '${MESSAGE_ID}'"
+            exit 1
+          fi
